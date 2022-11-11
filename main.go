@@ -23,28 +23,46 @@ type product struct {
 }
 
 func main() {
-	resultsProcessing := make(chan product, 2)
+	resultsProcessing := make(chan product, 4)
 	stopChan := make(chan struct{}, 1)
 
 	go fileProcessingJSON(resultsProcessing, stopChan)
 	go fileProcessingCSV(resultsProcessing, stopChan)
 
-	var resProducts []product
-	for i := 0; i < 2; i++ {
+	var resProcessing []product
+	for i := 0; i < 4; i++ {
 		select {
 		case resProd := <-resultsProcessing:
-			resProducts = append(resProducts, resProd)
+			resProcessing = append(resProcessing, resProd)
 		case <-stopChan:
 			return
 		}
 	}
 
-	// Если я правильно понял из условия задачи, приоритет сортировки в цене продукта.
-	sort.Slice(resProducts, func(i, j int) (less bool) {
-		return resProducts[i].Rating >= resProducts[j].Rating && resProducts[i].Price >= resProducts[j].Price
+	maxPrice, maxRating := calcMaxInArray(resProcessing)
+
+	fmt.Printf("Самый дорогой продукт:\n%+v\nс самым высоким рейтингом:\n%+v", maxPrice, maxRating)
+}
+
+func calcMaxInArray(arrProduct []product) (product, product) {
+	var maxPrice product
+	sort.Slice(arrProduct, func(i, j int) (less bool) {
+		if arrProduct[i].Price == arrProduct[j].Price {
+			return arrProduct[i].Rating >= arrProduct[j].Rating
+		}
+		return arrProduct[i].Price > arrProduct[j].Price
 	})
 
-	fmt.Println(resProducts[0])
+	maxPrice = arrProduct[0]
+
+	sort.Slice(arrProduct, func(i, j int) (less bool) {
+		if arrProduct[i].Rating == arrProduct[j].Rating {
+			return arrProduct[i].Price >= arrProduct[j].Price
+		}
+		return arrProduct[i].Rating > arrProduct[j].Rating
+	})
+
+	return maxPrice, arrProduct[0]
 }
 
 func fileProcessingJSON(resultsProcessing chan<- product, stopChan chan<- struct{}) {
@@ -76,11 +94,10 @@ func fileProcessingJSON(resultsProcessing chan<- product, stopChan chan<- struct
 		return
 	}
 
-	sort.Slice(productsFromJSON, func(i, j int) (less bool) {
-		return productsFromJSON[i].Rating >= productsFromJSON[j].Rating && productsFromJSON[i].Price >= productsFromJSON[j].Price
-	})
+	maxPrice, maxRating := calcMaxInArray(productsFromJSON)
 
-	resultsProcessing <- productsFromJSON[0]
+	resultsProcessing <- maxPrice
+	resultsProcessing <- maxRating
 }
 
 func fileProcessingCSV(resultsProcessing chan<- product, stopChan chan<- struct{}) {
@@ -129,9 +146,8 @@ func fileProcessingCSV(resultsProcessing chan<- product, stopChan chan<- struct{
 		productsFromCSV = append(productsFromCSV, productCSV)
 	}
 
-	sort.Slice(productsFromCSV, func(i, j int) (less bool) {
-		return productsFromCSV[i].Rating >= productsFromCSV[j].Rating && productsFromCSV[i].Price >= productsFromCSV[j].Price
-	})
+	maxPrice, maxRating := calcMaxInArray(productsFromCSV)
 
-	resultsProcessing <- productsFromCSV[0]
+	resultsProcessing <- maxPrice
+	resultsProcessing <- maxRating
 }
